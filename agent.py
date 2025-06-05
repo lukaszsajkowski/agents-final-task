@@ -24,6 +24,30 @@ def add_numbers(a: float, b: float) -> float:
     """Add two numbers together."""
     return a + b
 
+@tool
+def multiply_numbers(a: float, b: float) -> float:
+    """Multiply two numbers together."""
+    return a * b
+
+@tool
+def subtract_numbers(a: float, b: float) -> float:
+    """Subtract second number from first number."""
+    return a - b
+
+@tool
+def divide_numbers(a: float, b: float) -> float:
+    """Divide first number by second number."""
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+
+@tool
+def modulus_numbers(a: float, b: float) -> float:
+    """Get the remainder when first number is divided by second number."""
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a % b
+
 class AgentState(TypedDict):
     input_file: Optional[str]
     messages: Annotated[list[AnyMessage], add_messages]
@@ -43,7 +67,11 @@ seed_state: AgentState = {
 
 
 tools = [
-    add_numbers
+    add_numbers,
+    multiply_numbers,
+    subtract_numbers,
+    divide_numbers,
+    modulus_numbers
 ]
 
 def build_graph():
@@ -70,7 +98,7 @@ def build_graph():
 def main():
     agent = build_graph()
     state = seed_state.copy()
-    state["messages"].append(HumanMessage(content="What is 5.5 + 3.2?"))
+    state["messages"].append(HumanMessage(content="What is 5.5 + 3.2 * 5.3 - 2.2/1.5?"))
     result = agent.invoke(state)
     print("\nAll messages in the conversation:")
     for msg in result["messages"]:
