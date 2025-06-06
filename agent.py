@@ -48,6 +48,18 @@ def modulus_numbers(a: float, b: float) -> float:
         raise ValueError("Cannot divide by zero")
     return a % b
 
+@tool
+def search_wikipedia(query: str) -> str:
+    """Search for information on Wikipedia. Input should be a search query."""
+    try:
+        loader = WikipediaLoader(query=query, load_max_docs=1)
+        docs = loader.load()
+        if not docs:
+            return "No information found on Wikipedia for this query."
+        return docs[0].page_content[:1000]  # Return first 1000 chars to keep response concise
+    except Exception as e:
+        return f"Error searching Wikipedia: {str(e)}"
+
 class AgentState(TypedDict):
     input_file: Optional[str]
     messages: Annotated[list[AnyMessage], add_messages]
@@ -71,7 +83,8 @@ tools = [
     multiply_numbers,
     subtract_numbers,
     divide_numbers,
-    modulus_numbers
+    modulus_numbers,
+    search_wikipedia
 ]
 
 def build_graph():
@@ -98,7 +111,7 @@ def build_graph():
 def main():
     agent = build_graph()
     state = seed_state.copy()
-    state["messages"].append(HumanMessage(content="What is 5.5 + 3.2 * 5.3 - 2.2/1.5?"))
+    state["messages"].append(HumanMessage(content="Tell me about artificial intelligence"))
     result = agent.invoke(state)
     print("\nAll messages in the conversation:")
     for msg in result["messages"]:
