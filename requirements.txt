@@ -1,2 +1,14 @@
 gradio
 requests
+python-dotenv
+langgraph
+langchain-google-genai
+langchain-groq
+langchain-openai
+langchain-huggingface
+langchain-community
+langchain-core
+supabase
+pandas
+openpyxl
+tavily-python
