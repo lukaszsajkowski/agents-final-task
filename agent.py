@@ -18,39 +18,80 @@ from langchain_core.tools import tool
 from langchain.tools.retriever import create_retriever_tool
 from supabase.client import Client, create_client
 from typing import TypedDict, List, Dict, Any, Optional, Annotated
+import requests
+import os.path
 
 @tool
 def add_numbers(a: float, b: float) -> float:
-    """Add two numbers together."""
+    """Add two numbers together.
+    Args:
+        a (float): First number to add
+        b (float): Second number to add
+    Returns:
+        float: The sum of a and b
+    """
     return a + b
 
 @tool
 def multiply_numbers(a: float, b: float) -> float:
-    """Multiply two numbers together."""
+    """Multiply two numbers together.
+    Args:
+        a (float): First number to multiply
+        b (float): Second number to multiply
+    Returns:
+        float: The product of a and b
+    """
     return a * b
 
 @tool
 def subtract_numbers(a: float, b: float) -> float:
-    """Subtract second number from first number."""
+    """Subtract second number from first number.
+    Args:
+        a (float): Number to subtract from
+        b (float): Number to subtract
+    Returns:
+        float: The difference between a and b
+    """
     return a - b
 
 @tool
 def divide_numbers(a: float, b: float) -> float:
-    """Divide first number by second number."""
+    """Divide first number by second number.
+    Args:
+        a (float): Number to divide
+        b (float): Number to divide by
+    Returns:
+        float: The quotient of a divided by b
+    Raises:
+        ValueError: If b is zero
+    """
     if b == 0:
         raise ValueError("Cannot divide by zero")
     return a / b
 
 @tool
 def modulus_numbers(a: float, b: float) -> float:
-    """Get the remainder when first number is divided by second number."""
+    """Get the remainder when first number is divided by second number.
+    Args:
+        a (float): Number to divide
+        b (float): Number to divide by
+    Returns:
+        float: The remainder when a is divided by b
+    Raises:
+        ValueError: If b is zero
+    """
     if b == 0:
         raise ValueError("Cannot divide by zero")
     return a % b
 
 @tool
 def search_wikipedia(query: str) -> str:
-    """Search for information on Wikipedia. Input should be a search query."""
+    """Search for information on Wikipedia.
+    Args:
+        query (str): The search query to look up on Wikipedia
+    Returns:
+        str: The first 1000 characters of the Wikipedia article content, or an error message if not found
+    """
     try:
         loader = WikipediaLoader(query=query, load_max_docs=1)
         docs = loader.load()
@@ -62,7 +103,12 @@ def search_wikipedia(query: str) -> str:
 
 @tool
 def search_web(query: str) -> str:
-    """Search the web for current information. Input should be a search query."""
+    """Search the web for current information.
+    Args:
+        query (str): The search query to look up on the web
+    Returns:
+        str: Formatted results from the top 3 search results, including title, content, and URL
+    """
     try:
         search = TavilySearchResults(api_key=os.getenv("TAVILY_API_KEY"))
         results = search.invoke(query)
@@ -80,7 +126,12 @@ def search_web(query: str) -> str:
 
 @tool
 def search_arxiv(query: str) -> str:
-    """Search for academic papers on arXiv. Input should be a search query."""
+    """Search for academic papers on arXiv.
+    Args:
+        query (str): The search query to look up on arXiv
+    Returns:
+        str: Formatted results from up to 2 papers, including title, authors, publication date, abstract, and URL
+    """
     try:
         loader = ArxivLoader(query=query, load_max_docs=2)
         docs = loader.load()
@@ -103,6 +154,38 @@ def search_arxiv(query: str) -> str:
         return "\n".join(formatted_results)
     except Exception as e:
         return f"Error searching arXiv: {str(e)}"
+
+@tool
+def download_file(url: str, save_path: Optional[str] = None) -> str:
+    """Download a file from a URL.
+    Args:
+        url (str): The URL of the file to download
+        save_path (str, optional): Where to save the file. If not provided, uses the filename from the URL
+    Returns:
+        str: Success message with the save location or an error message if something goes wrong
+    """
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        
+        # If no save_path is provided, use the filename from the URL
+        if save_path is None:
+            save_path = os.path.basename(url)
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+        
+        # Download the file
+        with open(save_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        
+        return f"File successfully downloaded to: {save_path}"
+    except requests.exceptions.RequestException as e:
+        return f"Error downloading file: {str(e)}"
+    except Exception as e:
+        return f"Error saving file: {str(e)}"
 
 class AgentState(TypedDict):
     input_file: Optional[str]
@@ -130,7 +213,8 @@ tools = [
     modulus_numbers,
     search_wikipedia,
     search_web,
-    search_arxiv
+    search_arxiv,
+    download_file
 ]
 
 def build_graph():
