@@ -20,6 +20,9 @@ from supabase.client import Client, create_client
 from typing import TypedDict, List, Dict, Any, Optional, Annotated
 import requests
 import os.path
+import pandas as pd
+import json
+import openpyxl
 
 @tool
 def add_numbers(a: float, b: float) -> float:
@@ -187,6 +190,139 @@ def download_file(url: str, save_path: Optional[str] = None) -> str:
     except Exception as e:
         return f"Error saving file: {str(e)}"
 
+@tool
+def analyze_csv(file_path: str) -> str:
+    """Analyze a CSV file and return basic statistics and information.
+    Args:
+        file_path (str): Path to the CSV file to analyze
+    Returns:
+        str: A JSON string containing file information including:
+            - Number of rows and columns
+            - Column names and their data types
+            - Basic statistics for numeric columns
+            - Sample of first 5 rows
+            - Missing value counts per column
+    """
+    try:
+        # Read the CSV file
+        df = pd.read_csv(file_path)
+        
+        # Basic information
+        info = {
+            "rows": len(df),
+            "columns": len(df.columns),
+            "column_info": {},
+            "sample_data": df.head().to_dict(orient='records'),
+            "missing_values": df.isnull().sum().to_dict()
+        }
+        
+        # Get detailed column information
+        for column in df.columns:
+            col_info = {
+                "dtype": str(df[column].dtype),
+            }
+            
+            # Add statistics for numeric columns
+            if pd.api.types.is_numeric_dtype(df[column]):
+                col_info.update({
+                    "mean": float(df[column].mean()),
+                    "std": float(df[column].std()),
+                    "min": float(df[column].min()),
+                    "max": float(df[column].max()),
+                    "median": float(df[column].median())
+                })
+            # Add value counts for categorical columns
+            elif pd.api.types.is_categorical_dtype(df[column]) or pd.api.types.is_object_dtype(df[column]):
+                col_info["unique_values"] = int(df[column].nunique())
+                col_info["most_common"] = df[column].value_counts().head(3).to_dict()
+            
+            info["column_info"][column] = col_info
+        
+        return json.dumps(info, indent=2)
+    except Exception as e:
+        return f"Error analyzing CSV file: {str(e)}"
+
+@tool
+def analyze_excel(file_path: str, sheet_name: Optional[str] = None) -> str:
+    """Analyze an Excel file and return basic statistics and information.
+    Args:
+        file_path (str): Path to the Excel file to analyze
+        sheet_name (str, optional): Name of the sheet to analyze. If not provided, analyzes the first sheet
+    Returns:
+        str: A JSON string containing file information including:
+            - List of all sheets
+            - For the analyzed sheet:
+                - Number of rows and columns
+                - Column names and their data types
+                - Basic statistics for numeric columns
+                - Sample of first 5 rows
+                - Missing value counts per column
+                - Excel-specific information (merged cells, formulas, etc.)
+    """
+    try:
+        # Get Excel file information
+        wb = openpyxl.load_workbook(file_path, data_only=True)
+        sheet_names = wb.sheetnames
+        
+        # If no sheet specified, use the first one
+        if sheet_name is None:
+            sheet_name = sheet_names[0]
+        elif sheet_name not in sheet_names:
+            return f"Error: Sheet '{sheet_name}' not found. Available sheets: {', '.join(sheet_names)}"
+        
+        # Read the specified sheet
+        df = pd.read_excel(file_path, sheet_name=sheet_name)
+        
+        # Get Excel-specific information
+        ws = wb[sheet_name]
+        merged_cells = [str(cell) for cell in ws.merged_cells.ranges]
+        
+        # Basic information
+        info = {
+            "file_info": {
+                "total_sheets": len(sheet_names),
+                "sheet_names": sheet_names,
+                "current_sheet": sheet_name
+            },
+            "sheet_info": {
+                "rows": len(df),
+                "columns": len(df.columns),
+                "column_info": {},
+                "sample_data": df.head().to_dict(orient='records'),
+                "missing_values": df.isnull().sum().to_dict(),
+                "excel_specific": {
+                    "merged_cells": merged_cells,
+                    "has_formulas": any(cell.data_type == 'f' for row in ws.rows for cell in row)
+                }
+            }
+        }
+        
+        # Get detailed column information
+        for column in df.columns:
+            col_info = {
+                "dtype": str(df[column].dtype),
+            }
+            
+            # Add statistics for numeric columns
+            if pd.api.types.is_numeric_dtype(df[column]):
+                col_info.update({
+                    "mean": float(df[column].mean()),
+                    "std": float(df[column].std()),
+                    "min": float(df[column].min()),
+                    "max": float(df[column].max()),
+                    "median": float(df[column].median())
+                })
+            # Add value counts for categorical columns
+            elif pd.api.types.is_categorical_dtype(df[column]) or pd.api.types.is_object_dtype(df[column]):
+                col_info["unique_values"] = int(df[column].nunique())
+                col_info["most_common"] = df[column].value_counts().head(3).to_dict()
+            
+            info["sheet_info"]["column_info"][column] = col_info
+        
+        return json.dumps(info, indent=2)
+    except Exception as e:
+        return f"Error analyzing Excel file: {str(e)}"
+
 class AgentState(TypedDict):
     input_file: Optional[str]
     messages: Annotated[list[AnyMessage], add_messages]
@@ -214,7 +350,9 @@ tools = [
     search_wikipedia,
     search_web,
     search_arxiv,
-    download_file
+    download_file,
+    analyze_csv,
+    analyze_excel
 ]
 
 def build_graph():
